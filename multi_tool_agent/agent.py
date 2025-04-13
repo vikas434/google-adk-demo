@@ -23,7 +23,12 @@ logger.info(f"Set GOOGLE_APPLICATION_CREDENTIALS to {service_account_path}")
 
 # Get API keys from environment variables
 WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 logger.info(f"Weather API Key loaded: {'Yes' if WEATHER_API_KEY else 'No'}")
+logger.info(f"Gemini API Key loaded: {'Yes' if GEMINI_API_KEY else 'No'}")
+
+# Set the Gemini API key in the environment
+os.environ["GOOGLE_API_KEY"] = GEMINI_API_KEY
 
 def get_weather(city: str) -> dict:
     """Retrieves the current weather report for a specified city using WeatherAPI.com.
