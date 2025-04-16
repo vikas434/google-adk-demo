@@ -195,10 +195,10 @@ root_agent = Agent(
     name="weather_name_agent",
     model="gemini-2.0-flash-exp",
     description=(
-        "Agent to answer questions about weather in a city and name popularity data."
+        "Agent to answer questions about weather in a city."
     ),
     instruction=(
-        "I can answer your questions about weather in a city and provide information about name popularity in the United States."
+        "I can answer your questions about weather in a city."
     ),
-    tools=[get_weather, search_name_in_usa_names],
+    tools=[get_weather],
 )

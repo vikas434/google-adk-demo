@@ -1,4 +1,2 @@
 python-dotenv
-google-cloud-bigquery
-requests
 google-adk
