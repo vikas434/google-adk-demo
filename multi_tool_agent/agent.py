@@ -3,8 +3,8 @@ import logging
 import os
 import requests
 from google.adk.agents import Agent
-from google.cloud import bigquery
 from dotenv import load_dotenv
+from typing import List, Dict, Optional
 
 # Configure logging
 logging.basicConfig(
@@ -16,11 +16,6 @@ logger = logging.getLogger('adk_agent')
 # Load environment variables
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
-# Set the GOOGLE_APPLICATION_CREDENTIALS environment variable
-service_account_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "service_account.json")
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = service_account_path
-logger.info(f"Set GOOGLE_APPLICATION_CREDENTIALS to {service_account_path}")
-
 # Get API keys from environment variables
 WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -29,6 +24,71 @@ logger.info(f"Gemini API Key loaded: {'Yes' if GEMINI_API_KEY else 'No'}")
 
 # Set the Gemini API key in the environment
 os.environ["GOOGLE_API_KEY"] = GEMINI_API_KEY
+
+# TODO: Replace these mock events with actual Google Calendar API integration
+# These are temporary mock events for demonstration purposes only
+# In production, this should be replaced with:
+# 1. Google Calendar API authentication
+# 2. Real-time calendar event fetching
+# 3. Proper event synchronization
+MOCK_CALENDAR_EVENTS = [
+    {
+        "title": "Deep Learning Lecture",
+        "start_time": "08:50",
+        "end_time": "10:20",
+        "day": "Monday",
+        "location": "Room 101",
+        "instructor": "Dr. Smith"
+    },
+    {
+        "title": "Agentic AI Lecture",
+        "start_time": "15:00",
+        "end_time": "16:30",
+        "day": "Monday",
+        "location": "Room 203",
+        "instructor": "Prof. Johnson"
+    },
+    {
+        "title": "Machine Learning Lab",
+        "start_time": "13:00",
+        "end_time": "15:00",
+        "day": "Wednesday",
+        "location": "Lab 3",
+        "instructor": "Dr. Brown"
+    },
+    {
+        "title": "Natural Language Processing",
+        "start_time": "11:00",
+        "end_time": "12:30",
+        "day": "Friday",
+        "location": "Room 105",
+        "instructor": "Prof. Davis"
+    },
+    {
+        "title": "Agentic AI Project Report Submission",
+        "start_time": "10:00",
+        "end_time": "11:00",
+        "day": "Saturday",
+        "location": "Online",
+        "instructor": "Prof. Johnson"
+    },
+    {
+        "title": "Deep Learning Assignment Review",
+        "start_time": "14:00",
+        "end_time": "15:30",
+        "day": "Saturday",
+        "location": "Virtual Classroom",
+        "instructor": "Dr. Smith"
+    },
+    {
+        "title": "Research Paper Discussion",
+        "start_time": "16:00",
+        "end_time": "17:30",
+        "day": "Saturday",
+        "location": "Library Study Room",
+        "instructor": "Dr. Brown"
+    }
+]
 
 def get_weather(city: str) -> dict:
     """Retrieves the current weather report for a specified city using WeatherAPI.com.
@@ -95,110 +155,103 @@ def get_weather(city: str) -> dict:
             "error_message": f"Unexpected error retrieving weather information: {str(e)}"
         }
 
-
-def search_name_in_usa_names(name: str) -> dict:
-    """Searches for a name in the USA Names public dataset.
-    
-    This function queries the BigQuery public dataset to find information about
-    how many times a specific name has been used in the United States between 1910 and 2013.
+def get_calendar_info(query: str) -> dict:
+    """Retrieves calendar information based on the query.
     
     Args:
-        name (str): The name to search for in the dataset.
+        query (str): The query about calendar events (e.g., "What's my schedule for Monday?",
+                    "When is my next lecture?", "Where is the Deep Learning class?")
         
     Returns:
         dict: status and result or error msg.
     """
-    logger.info(f"Starting search for name: '{name}' in USA Names dataset")
+    logger.info(f"Processing calendar query: {query}")
+    
     try:
-        # Initialize BigQuery client using Application Default Credentials
-        logger.info("Initializing BigQuery client using Application Default Credentials")
-        client = bigquery.Client()
-        logger.info("BigQuery client initialized successfully")
+        # Convert query to lowercase for case-insensitive matching
+        query = query.lower()
         
-        # Define the query to search for the name in the USA Names dataset
-        query = """
-        SELECT
-          name,
-          SUM(number) AS total_occurrences
-        FROM
-          `bigquery-public-data.usa_names.usa_1910_2013`
-        WHERE
-          LOWER(name) = LOWER(@name)
-        GROUP BY
-          name
-        """
-        logger.info(f"Query prepared: {query}")
+        # Get current day and time
+        now = datetime.datetime.now()
+        current_day = now.strftime("%A")
+        current_time = now.strftime("%H:%M")
         
-        # Set up the query parameters
-        logger.info(f"Setting up query parameters with name: '{name}'")
-        job_config = bigquery.QueryJobConfig(
-            query_parameters=[
-                bigquery.ScalarQueryParameter("name", "STRING", name),
-            ]
-        )
-        
-        # Execute the query
-        logger.info("Executing BigQuery query")
-        start_time = datetime.datetime.now()
-        query_job = client.query(query, job_config=job_config)
-        
-        # Wait for the query to complete
-        logger.info("Waiting for query results")
-        results = query_job.result()
-        end_time = datetime.datetime.now()
-        execution_time = (end_time - start_time).total_seconds()
-        logger.info(f"Query executed in {execution_time:.2f} seconds")
-        
-        # Process the results
-        logger.info("Processing query results")
-        rows = list(results)
-        logger.info(f"Query returned {len(rows)} rows")
-        
-        if rows:
-            # Get the first row (there should only be one)
-            row = rows[0]
-            logger.info(f"Found data for name '{row.name}': {row.total_occurrences} occurrences")
-            result = {
-                "name": row.name,
-                "total_occurrences": row.total_occurrences
-            }
-            
-            report = (
-                f"The name '{result['name']}' has been used {result['total_occurrences']} times "
-                f"in the United States between 1910 and 2013."
-            )
-        else:
-            logger.info(f"No data found for name '{name}'")
-            result = {
-                "name": name,
-                "total_occurrences": 0
-            }
-            
-            report = f"The name '{name}' was not found in the USA Names dataset."
-        
-        logger.info("Name search completed successfully")
-        return {
+        # Initialize response
+        response = {
             "status": "success",
-            "report": report,
-            "data": result
+            "events": [],
+            "message": ""
         }
+        
+        # Handle different types of queries
+        if "today" in query or current_day.lower() in query:
+            # Filter events for today
+            today_events = [event for event in MOCK_CALENDAR_EVENTS 
+                          if event["day"].lower() == current_day.lower()]
+            if today_events:
+                response["events"] = today_events
+                response["message"] = f"Here are your events for {current_day}:"
+            else:
+                response["message"] = f"You have no events scheduled for {current_day}."
+                
+        elif "next" in query:
+            # Find next event
+            all_events = sorted(MOCK_CALENDAR_EVENTS, 
+                              key=lambda x: (x["day"], x["start_time"]))
+            next_event = None
+            for event in all_events:
+                if (event["day"] == current_day and event["start_time"] > current_time) or \
+                   (event["day"] != current_day):
+                    next_event = event
+                    break
+            if next_event:
+                response["events"] = [next_event]
+                response["message"] = "Your next event is:"
+            else:
+                response["message"] = "You have no upcoming events."
+                
+        elif any(event["title"].lower() in query for event in MOCK_CALENDAR_EVENTS):
+            # Search for specific event
+            for event in MOCK_CALENDAR_EVENTS:
+                if event["title"].lower() in query:
+                    response["events"] = [event]
+                    response["message"] = f"Here's the information about {event['title']}:"
+                    break
+                    
+        else:
+            # Return all events if no specific query
+            response["events"] = MOCK_CALENDAR_EVENTS
+            response["message"] = "Here are all your scheduled events:"
+        
+        # Format the response
+        if response["events"]:
+            formatted_events = []
+            for event in response["events"]:
+                formatted_event = (
+                    f"{event['title']} "
+                    f"({event['day']}, {event['start_time']}-{event['end_time']}) "
+                    f"at {event['location']} with {event['instructor']}"
+                )
+                formatted_events.append(formatted_event)
+            response["formatted_events"] = formatted_events
+        
+        return response
         
     except Exception as e:
-        logger.error(f"Error in search_name_in_usa_names: {str(e)}", exc_info=True)
+        logger.error(f"Error in get_calendar_info: {str(e)}", exc_info=True)
         return {
             "status": "error",
-            "error_message": f"Error searching for name in USA Names dataset: {str(e)}"
+            "error_message": f"Error retrieving calendar information: {str(e)}"
         }
 
-
 root_agent = Agent(
-    name="weather_name_agent",
+    name="student_assistant",
     model="gemini-2.0-flash-exp",
     description=(
-        "Agent to answer questions about weather in a city."
+        "Agent to answer questions about weather and student calendar."
     ),
     instruction=(
-        "I can answer your questions about weather in a city."
+        "I can answer your questions about weather in a city and your student calendar."
     ),
-    tools=[get_weather],
+    tools=[get_weather, get_calendar_info],
 )
